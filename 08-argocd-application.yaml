@@ -1,0 +1,21 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: ai-inference
+  namespace: argocd
+spec:
+  project: default
+  source:
+    # TODO: 이 매니페스트들을 올려둔 실제 git repo/branch/경로로 교체
+    repoURL: https://github.com/<YOUR_GITHUB_USERNAME>/ai-inference-chaos-lab.git
+    targetRevision: main
+    path: k8s
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: ai-inference
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

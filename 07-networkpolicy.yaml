@@ -1,0 +1,50 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: inference-service-policy
+  namespace: ai-inference
+spec:
+  podSelector:
+    matchLabels:
+      app: inference-service
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # 1) ingress-nginx 로부터의 트래픽만 8000 포트로 허용
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
+      ports:
+        - protocol: TCP
+          port: 8000
+    # 2) 모니터링 네임스페이스(Prometheus)에서 /metrics 스크랩 허용
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+      ports:
+        - protocol: TCP
+          port: 8000
+  egress:
+    # DNS 조회는 항상 허용
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    # 모델이 이미지에 baked-in 되어 있으므로 그 외 외부 egress는 기본적으로 불필요.
+    # 필요 시(예: 외부 API 호출) 아래처럼 특정 CIDR/포트만 열어서 최소권한 유지.
+    # - to:
+    #     - ipBlock:
+    #         cidr: 0.0.0.0/0
+    #   ports:
+    #     - protocol: TCP
+    #       port: 443
+
+# 실제 네임스페이스 라벨명은 클러스터마다 다를 수 있으니
+#   kubectl get ns --show-labels
+# 로 ingress-nginx / monitoring 네임스페이스의 실제 라벨을 확인 후 맞춰주세요.

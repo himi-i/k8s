@@ -1,0 +1,79 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: inference-service
+  namespace: ai-inference
+  labels:
+    app: inference-service
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: inference-service
+  template:
+    metadata:
+      labels:
+        app: inference-service
+      annotations:
+        # kube-prometheus-stack 이 ServiceMonitor 없이도 직접 스크랩하도록 하고 싶다면 사용
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8000"
+        prometheus.io/path: "/metrics"
+    spec:
+      # --- Gatekeeper Pod Security 정책 체계 준수 ---
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: inference
+          # TODO: 실제 Docker Hub 계정으로 교체 후 build & push
+          #   docker build -t <DOCKERHUB_USERNAME>/ai-inference:v1 ./app
+          #   docker push <DOCKERHUB_USERNAME>/ai-inference:v1
+          image: <DOCKERHUB_USERNAME>/ai-inference:v1
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8000
+          env:
+            - name: MAX_QUEUE_DEPTH
+              value: "40"
+            # 카오스 실험에서 콜드스타트 영향을 과장해서 보고 싶을 때 값 조절
+            - name: STARTUP_DELAY_SECONDS
+              value: "0"
+          resources:
+            # 의도적으로 여유를 빡빡하게 잡아 메모리 스트레스 카오스 실험(OOM 시나리오)에 활용
+            requests:
+              cpu: "250m"
+              memory: "512Mi"
+            limits:
+              cpu: "500m"
+              memory: "768Mi"
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: 8000
+            initialDelaySeconds: 2
+            periodSeconds: 3
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          startupProbe:
+            # 모델 로딩(콜드스타트)이 길어질 수 있으므로 startupProbe로 넉넉하게 대기
+            httpGet:
+              path: /readyz
+              port: 8000
+            failureThreshold: 30
+            periodSeconds: 2
+          securityContext:
+            allowPrivilegeEscalation: false
+            privileged: false
+            capabilities:
+              drop: ["ALL"]

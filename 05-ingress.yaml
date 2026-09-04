@@ -1,0 +1,33 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: inference-service
+  namespace: ai-inference
+  annotations:
+    # cert-manager 설치 시 만든 ClusterIssuer 이름으로 교체
+    # (staging으로 먼저 검증 후 issuer만 prod로 바꾸는 걸 추천)
+    cert-manager.io/cluster-issuer: letsencrypt-staging
+    nginx.ingress.kubernetes.io/proxy-body-size: "2m"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - inference.YOUR-DOMAIN.com
+      secretName: inference-service-tls
+  rules:
+    - host: inference.YOUR-DOMAIN.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: inference-service
+                port:
+                  number: 80
+
+# TODO:
+# 1) inference.YOUR-DOMAIN.com 을 실제 보유 도메인으로 교체
+# 2) 해당 도메인 A 레코드를 fw-01의 외부 IP(34.47.76.134)로 지정
+#    (fw-01이 인그레스 트래픽의 진입점이 되도록 포트포워딩/방화벽 룰 구성)
+# 3) letsencrypt-staging 으로 먼저 발급 검증 후 letsencrypt-prod ClusterIssuer로 전환
