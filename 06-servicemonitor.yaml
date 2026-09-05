@@ -4,9 +4,8 @@ metadata:
   name: inference-service
   namespace: ai-inference
   labels:
-    # kube-prometheus-stack의 Prometheus CR이 이 라벨로 ServiceMonitor를 선택하도록
-    # 되어있는지 확인 필요 (release: <helm-release-name> 이 보통 기본값)
-    release: kube-prometheus-stack
+    # 이름 확인 후 변경
+    release: kube-prometheus
 spec:
   selector:
     matchLabels:
