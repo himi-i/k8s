@@ -41,6 +41,11 @@ spec:
             # 카오스 실험에서 콜드스타트 영향을 과장해서 보고 싶을 때 값 조절
             - name: STARTUP_DELAY_SECONDS
               value: "0"
+            # 보안 정책 이슈
+            - name: HF_HUB_OFFLINE
+              value: "1"
+            - name: TRANSFORMERS_OFFLINE
+              value: "1"
           resources:
             # 의도적으로 여유를 빡빡하게 잡아 메모리 스트레스 카오스 실험(OOM 시나리오)에 활용
             requests:
