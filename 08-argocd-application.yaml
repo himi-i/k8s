@@ -9,7 +9,7 @@ spec:
     # TODO: 이 매니페스트들을 올려둔 실제 git repo/branch/경로로 교체
     repoURL: https://github.com/himi-i/k8s.git
     targetRevision: main
-    path: k8s
+    path: .
   destination:
     server: https://kubernetes.default.svc
     namespace: ai-inference
