@@ -15,7 +15,6 @@ spec:
       labels:
         app: inference-service
       annotations:
-        # kube-prometheus-stack 이 ServiceMonitor 없이도 직접 스크랩하도록 하고 싶다면 사용
         prometheus.io/scrape: "true"
         prometheus.io/port: "8000"
         prometheus.io/path: "/metrics"
@@ -28,8 +27,39 @@ spec:
         fsGroup: 1000
         seccompProfile:
           type: RuntimeDefault
+
+      # 모델 다운로드는 model-downloader Job이 담당(ArgoCD sync-wave -1).
+      # 이 initContainer는 다운로드를 하지 않고, PV에 모델이 준비될 때까지
+      # "대기"만 한다 -> 네트워크 접근이 필요 없어서 NetworkPolicy 예외가 필요 없음.
+      initContainers:
+        - name: wait-for-model
+          image: busybox:1.36
+          command: ["sh", "-c"]
+          args:
+            - |
+              echo "Waiting for model cache to be populated..."
+              i=0
+              until [ -d /model-cache/models--distilbert-base-uncased-finetuned-sst-2-english ]; do
+                i=$((i+1))
+                if [ "$i" -gt 60 ]; then
+                  echo "Timed out waiting for model cache (model-downloader Job이 끝났는지 확인 필요)"
+                  exit 1
+                fi
+                sleep 2
+              done
+              echo "Model cache is ready."
+          volumeMounts:
+            - name: model-cache
+              mountPath: /model-cache
+              readOnly: true
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+
       containers:
         - name: inference
+          # GitHub Actions(Docker Image CI)가 main 브랜치 push 시 자동 빌드/push함
           image: ikdamservice/k8s-project:latest
           imagePullPolicy: IfNotPresent
           ports:
@@ -38,16 +68,21 @@ spec:
           env:
             - name: MAX_QUEUE_DEPTH
               value: "40"
-            # 카오스 실험에서 콜드스타트 영향을 과장해서 보고 싶을 때 값 조절
             - name: STARTUP_DELAY_SECONDS
               value: "0"
-            # 보안 정책 이슈
+            # 모델을 PV에서 읽도록 지정 (더 이상 이미지 내부 캐시 아님)
+            - name: HF_HOME
+              value: "/model-cache"
+            # 혹시라도 huggingface 라이브러리가 최신 버전 확인하러 네트워크를 타지 않도록 강제
             - name: HF_HUB_OFFLINE
               value: "1"
             - name: TRANSFORMERS_OFFLINE
               value: "1"
+          volumeMounts:
+            - name: model-cache
+              mountPath: /model-cache
+              readOnly: true
           resources:
-            # 의도적으로 여유를 빡빡하게 잡아 메모리 스트레스 카오스 실험(OOM 시나리오)에 활용
             requests:
               cpu: "250m"
               memory: "512Mi"
@@ -68,7 +103,6 @@ spec:
             initialDelaySeconds: 5
             periodSeconds: 10
           startupProbe:
-            # 모델 로딩(콜드스타트)이 길어질 수 있으므로 startupProbe로 넉넉하게 대기
             httpGet:
               path: /readyz
               port: 8000
@@ -79,3 +113,9 @@ spec:
             privileged: false
             capabilities:
               drop: ["ALL"]
+
+      volumes:
+        - name: model-cache
+          persistentVolumeClaim:
+            claimName: model-cache-pvc
+            readOnly: true
