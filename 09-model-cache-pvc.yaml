@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: model-cache-pvc
+  namespace: ai-inference
+  annotations:
+    # 다른 리소스보다 먼저 생성되도록 (Job보다도 먼저)
+    argocd.argoproject.io/sync-wave: "-2"
+spec:
+  accessModes:
+    - ReadWriteMany   # Longhorn Share Manager를 통해 여러 파드가 동시에 read
+  storageClassName: longhorn
+  resources:
+    requests:
+      storage: 2Gi

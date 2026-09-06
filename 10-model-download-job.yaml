@@ -1,0 +1,55 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: model-downloader
+  namespace: ai-inference
+  annotations:
+    # PVC(-2)보다는 늦게, Deployment(0)보다는 먼저 실행되도록
+    argocd.argoproject.io/sync-wave: "-1"
+spec:
+  backoffLimit: 3
+  template:
+    spec:
+      restartPolicy: OnFailure
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: downloader
+          # inference 서비스와 같은 이미지 재사용 (transformers/torch 이미 설치돼있음 -> pip install 불필요)
+          image: ikdamservice/k8s-project:latest
+          command: ["python", "-c"]
+          args:
+            - |
+              import os
+              from transformers import pipeline
+
+              cache_dir = "/model-cache"
+              marker = os.path.join(cache_dir, "models--distilbert-base-uncased-finetuned-sst-2-english")
+
+              if os.path.isdir(marker):
+                  print(f"[model-downloader] already cached at {marker}, skipping download")
+              else:
+                  print("[model-downloader] not found, downloading...")
+                  os.environ["HF_HOME"] = cache_dir
+                  pipeline("sentiment-analysis", model="distilbert-base-uncased-finetuned-sst-2-english")
+                  print("[model-downloader] download complete")
+          volumeMounts:
+            - name: model-cache
+              mountPath: /model-cache
+          securityContext:
+            allowPrivilegeEscalation: false
+            privileged: false
+            capabilities:
+              drop: ["ALL"]
+      volumes:
+        - name: model-cache
+          persistentVolumeClaim:
+            claimName: model-cache-pvc
+
+# 참고: 이 Job은 NetworkPolicy가 app=inference-service 라벨만 선택하기 때문에
+# egress 차단 대상이 아님 -> huggingface.co 접근이 자유로움 (의도된 설계)
