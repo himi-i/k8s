@@ -12,14 +12,14 @@ RUN pip install --no-cache-dir torch --index-url https://download.pytorch.org/wh
 
 COPY main.py .
 
-ENV HF_HOME=/home/appuser/.cache/huggingface
-RUN mkdir -p "$HF_HOME" && chown -R appuser:appuser /home/appuser /app
+RUN chown -R appuser:appuser /home/appuser /app
 
 USER appuser
 
-# 모델을 빌드 타임에 미리 다운로드해서 이미지에 굽는다.
-# -> 런타임 파드에 NetworkPolicy로 외부 egress를 막아도 정상 동작 (콜드스타트 = 로컬 로딩 시간만 반영)
-RUN python -c "from transformers import pipeline; pipeline('sentiment-analysis', model='distilbert-base-uncased-finetuned-sst-2-english')"
+# 모델은Longhorn PV(model-cache-pvc)를 HF_HOME으로 마운트해서 씀.
+# - model-downloader Job이 최초 1회 PV에 다운로드
+# - inference-service 파드는 initContainer로 준비될 때까지 대기 후 읽기 전용으로 마운트
+# (이 이미지는 model-downloader Job에서도 그대로 재사용되므로 transformers/torch는 유지)
 
 EXPOSE 8000
 
