@@ -22,20 +22,24 @@ spec:
         - name: downloader
           # inference 서비스와 같은 이미지 재사용 (transformers/torch 이미 설치돼있음 -> pip install 불필요)
           image: ikdamservice/k8s-project:latest
+          env:
+            # 컨테이너 env로 지정 -> Python import 이전에 이미 확정되므로 확실하게 적용됨
+            - name: HF_HOME
+              value: "/model-cache"
           command: ["python", "-c"]
           args:
             - |
               import os
               from transformers import pipeline
-
-              cache_dir = "/model-cache"
-              marker = os.path.join(cache_dir, "models--distilbert-base-uncased-finetuned-sst-2-english")
-
+ 
+              cache_dir = os.environ["HF_HOME"]
+              # 최신 huggingface_hub는 $HF_HOME/hub/ 밑에 저장함
+              marker = os.path.join(cache_dir, "hub", "models--distilbert-base-uncased-finetuned-sst-2-english")
+ 
               if os.path.isdir(marker):
                   print(f"[model-downloader] already cached at {marker}, skipping download")
               else:
                   print("[model-downloader] not found, downloading...")
-                  os.environ["HF_HOME"] = cache_dir
                   pipeline("sentiment-analysis", model="distilbert-base-uncased-finetuned-sst-2-english")
                   print("[model-downloader] download complete")
           volumeMounts:
@@ -51,5 +55,5 @@ spec:
           persistentVolumeClaim:
             claimName: model-cache-pvc
 
-# 참고: 이 Job은 NetworkPolicy가 app=inference-service 라벨만 선택하기 때문에
-# egress 차단 대상이 아님 -> huggingface.co 접근이 자유로움 (의도된 설계)
+# 이 Job은 NetworkPolicy가 app=inference-service 라벨만 선택하기 때문에
+# egress 차단 대상이 아님 -> huggingface.co 접근이 자유로움 
