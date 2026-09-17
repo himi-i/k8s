@@ -1,0 +1,23 @@
+controller:
+  serviceType: ClusterIP   # 나중에 Ingress로 노출할 예정 (fw-01 통해서)
+  resources:
+    requests:
+      cpu: "500m"
+      memory: "1Gi"
+    limits:
+      cpu: "1"
+      memory: "1.5Gi"
+  # Gatekeeper를 지금은 안 쓰지만, 안전하게 설정해둠
+  containerSecurityContext:
+    runAsNonRoot: true
+    allowPrivilegeEscalation: false
+
+persistence:
+  enabled: true
+  storageClass: longhorn
+  size: 8Gi
+
+# Kubernetes 플러그인은 이 차트에 기본 포함되어 있고,
+# 빌드 에이전트를 동적으로 파드로 띄우는 설정은 Jenkins 자체 UI/Jenkinsfile에서 함
+agent:
+  enabled: false   # 기본 제공 JNLP agent는 안 쓰고, Kaniko 파드 템플릿을 Jenkinsfile에서 직접 정의할 예정
