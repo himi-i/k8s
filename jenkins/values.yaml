@@ -1,5 +1,7 @@
 controller:
-  serviceType: ClusterIP   # 나중에 Ingress로 노출할 예정 (fw-01 통해서)
+  serviceType: NodePort
+  servicePort: 8080
+  nodePort: 32080
   resources:
     requests:
       cpu: "500m"
