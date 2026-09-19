@@ -13,7 +13,7 @@ spec:
     tty: true
     resources:
       requests: { cpu: 500m, memory: 1Gi }
-      limits:   { cpu: "2",  memory: 3Gi }   # torch 레이어 빌드 시 OOMKilled 나면 조정
+      limits:   { cpu: "2",  memory: 3Gi } 
     volumeMounts:
     - name: docker-config
       mountPath: /kaniko/.docker
